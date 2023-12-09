@@ -1,9 +1,9 @@
 import cv2
 import numpy as np
-import logging
 import math
 import datetime
 import sys
+import matplotlib.image
 
 _SHOW_IMAGE = False
 
@@ -58,16 +58,17 @@ def detect_edges(img):
     show_img("hsv", hsv)
 
     # threshold for counting a pixel as white
-    sensitivity = 20
-    lower_white = np.array([0, 0, 255-sensitivity])
-    upper_white = np.array([255, sensitivity, 255])
+    sensitivity = 30
+    lower_white = np.array([98, 0, 255-sensitivity])
+    upper_white = np.array([179, 179, 255])
 
     mask = cv2.inRange(hsv, lower_white, upper_white)
 
     # detect edges
     edges = cv2.Canny(mask, 200, 400)
     show_img("edges", edges)
-
+    matplotlib.image.imsave("canny_result.png", edges)
+    
     return edges
 
 def clip_screen(canny):
