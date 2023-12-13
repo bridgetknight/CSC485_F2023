@@ -15,6 +15,7 @@ class Follower(object):
 
     def follow(self, img):
         show_img("orig", img)
+       # img = cv2.rotate(img, cv2.ROTATE_90_COUNTERCLOCKWISE)
         lane_lines, img = detect_lane(img)
 
         final_img = self.steer(img, lane_lines)
@@ -25,8 +26,12 @@ class Follower(object):
         if len(lane_lines) == 0:
             return img
         new_steering_angle = compute_steering_angle(img, lane_lines)
-        self.curr_steering_angle = stabilize_steering_angle(self.curr_steering_angle, new_steering_angle, len(lane_lines))
-
+        print(f"new angle: {new_steering_angle}")
+        print(f"old angle: {self.curr_steering_angle}")
+        self.curr_steering_angle = stabilize_steering_angle(self.curr_steering_angle, new_steering_angle, len(lane_lines))        
+        #self.curr_steering_angle = new_steering_angle
+        print(f"new2 angle: {self.curr_steering_angle}")
+        
         if self.car is not None:
             self.car.front_wheels.turn(self.curr_steering_angle)
         
@@ -36,9 +41,21 @@ class Follower(object):
         return curr_img
         
 def detect_lane(img):
-    canny = detect_edges(img)
-    #show_img("edges", canny)
+    edges = detect_edges(img)
+    show_img("edges", edges)
 
+    cropped_edges = clip_screen(edges)
+
+    line_segments = edge_tracking(cropped_edges)
+    line_segment_img = display_lines(img, line_segments)
+    show_img("line segments", line_segment_img)
+
+    lane_lines = lane_slope(img, line_segments)
+    lane_lines_img = display_lines(img, lane_lines)
+
+    return lane_lines, lane_lines_img
+
+def clip_screen(canny):
     h, w = canny.shape 
     mask = np.zeros_like(canny)
 
@@ -56,16 +73,7 @@ def detect_lane(img):
     cropped_edges = cv2.bitwise_and(canny, mask)
     
     show_img("edges clipped", cropped_edges)
-
-    line_segments = edge_tracking(cropped_edges)
-    line_segment_img = display_lines(img, line_segments)
-    show_img("line segments", line_segment_img)
-
-    lane_lines = lane_slope(img, line_segments)
-    lane_lines_img = display_lines(img, lane_lines)
-
-    return lane_lines, lane_lines_img
-
+    return cropped_edges
 
 def detect_edges(img):
     # filter out white lines
@@ -74,8 +82,8 @@ def detect_edges(img):
 
     # threshold for counting a pixel as white
     sensitivity = 30
-    lower_white = np.array([96, 0, 210])
-    upper_white = np.array([173, 255, 255])
+    lower_white = np.array([0, 0, 147])
+    upper_white = np.array([34, 118, 255])
 
     mask = cv2.inRange(hsv, lower_white, upper_white)
 
@@ -85,10 +93,6 @@ def detect_edges(img):
     matplotlib.image.imsave("canny_result.png", edges)
     
     return edges
-
-def clip_screen(canny):
-
-    return masked_img
 
 def edge_tracking(cropped_edges):
     precision = 1 # 1 pixel
@@ -125,15 +129,15 @@ def lane_slope(img, line_segments):
                 if x1 > right_lane_boundary and x2 > right_lane_boundary:
                     right.append((m, b))
 
-    left_avg = np.average(left, axis=0)
-    if len(left) > 0:
-        lane_lines.append(make_points(img, left_avg))
-    
-    right_avg = np.average(right, axis=0)
-    if len(right) > 0:
-        lane_lines.append(make_points(img, right_avg))
+            left_avg = np.average(left, axis=0)
+            if len(left) > 0:
+                lane_lines.append(make_points(img, left_avg))
+            
+            right_avg = np.average(right, axis=0)
+            if len(right) > 0:
+                lane_lines.append(make_points(img, right_avg))
 
-    return lane_lines
+                return lane_lines
 
 
 # * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * #
@@ -160,7 +164,7 @@ def display_heading_line(img, steering_angle, line_color=(0, 0, 255), line_width
     # Note: the steering angle of:
     # 0-89 degree: turn left
     # 90 degree: going straight
-    # 91-180 degree: turn right 
+    # 91-180 degree: turn right
     steering_angle_radian = steering_angle / 180.0 * math.pi
     x1 = int(width / 2)
     y1 = height
@@ -252,6 +256,6 @@ def stabilize_steering_angle(curr_steering_angle, new_steering_angle, num_of_lan
 
 
 if __name__ == "__main__":
-    f = "test_data/center_lane.jpg"
+    f = "../test_data/center_lane.jpg"
     print(f"testing {f}")
     test_photo(f)
